@@ -1,35 +1,57 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react-swc'
-import pkg from "./package.json";
-import dts from "vite-plugin-dts";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
+import react from '@vitejs/plugin-react-swc';
+import { resolve, relative, extname } from 'path';
+import { defineConfig } from 'vite';
+import dts from "vite-plugin-dts";
+import pkg from "./package.json";
+import { glob } from 'glob'
+
+import { fileURLToPath } from 'url';
 import tsconfigPaths from "vite-tsconfig-paths";
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), vanillaExtractPlugin(), tsconfigPaths(), dts({
+    // include: ["./lib/index.ts", "./lib/**/*.ts", "./lib/**/*.tsx"],
     exclude: ["node_modules", "dist"],
-    rollupTypes: true,
+    // rollupTypes: true,
+    // insertTypesEntry: true,
+    // insertTypesEntry: true,
+
+    include: resolve(__dirname, 'lib/**/*.{ts,tsx}'),
     compilerOptions: {
-      baseUrl: "./",
+      baseUrl: "./lib/",
       emitDeclarationOnly: true,
       noEmit: false
     },
     outDir: "dist/types",
   }),],
+  resolve: {
+    alias: {
+      "@": "/lib"
+    }
+  },
   build: {
     lib: {
-      entry: "./lib/index.ts",
+      entry: resolve(__dirname, 'lib/index.ts'),
       fileName: 'index',
-      formats: ['es', 'cjs']
+      formats: ['es']
     },
     rollupOptions: {
       external: Object.keys(pkg.dependencies),
       output: {
-        globals: {
-          react: 'React',
-          'react-dom': 'ReactDOM'
-        }
-      }
+        assetFileNames: 'assets/[name][extname]',
+        chunkFileNames: 'chunks/[name].[hash].js',
+        entryFileNames: '[name].js',
+      },
+      input: Object.fromEntries(
+        glob.sync(resolve(__dirname, 'lib/**/*.{ts,tsx}')).map((file) => [
+          relative('lib', file.slice(0, file.length - extname(file).length)),
+          fileURLToPath(new URL(file, import.meta.url))
+        ])
+      ),
     }
   }
 })
